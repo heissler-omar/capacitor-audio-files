@@ -1,30 +1,22 @@
 package com.opusaudio.audiofiles;
 
+import android.app.Activity;
 import android.content.Intent;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Build;
 import android.provider.DocumentsContract;
-import android.provider.MediaStore;
 import android.webkit.MimeTypeMap;
-
 import androidx.annotation.RequiresApi;
-import androidx.activity.result.ActivityResultLauncher;
-import androidx.activity.result.contract.ActivityResultContracts;
-import androidx.core.content.ContextCompat;
-
-import com.getcapacitor.Bridge;
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.annotation.CapacitorPlugin;
 import com.getcapacitor.annotation.Permission;
-import com.getcapacitor.annotation.PermissionCallback;
-import android.Manifest;
 import com.getcapacitor.PluginMethod;
+import android.Manifest;
 
-import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -61,7 +53,7 @@ public class AudioFilesPlugin extends Plugin {
     protected void handleOnActivityResult(int requestCode, int resultCode, Intent data) {
         super.handleOnActivityResult(requestCode, resultCode, data);
         if (requestCode == REQUEST_CODE_OPEN_DIRECTORY) {
-            if (resultCode == getActivity().RESULT_OK && data != null) {
+            if (resultCode == Activity.RESULT_OK && data != null) {
                 Uri treeUri = data.getData();
                 String path = treeUri.getPath();
 
@@ -69,12 +61,21 @@ public class AudioFilesPlugin extends Plugin {
                     getActivity().getContentResolver().takePersistableUriPermission(treeUri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
                     JSObject result = new JSObject();
                     result.put("uri", treeUri.toString());
-                    savedCall.resolve(result);
+                    if (savedCall != null) {
+                        savedCall.resolve(result);
+                    } else {
+                        // Log para ver si savedCall es null
+                        System.out.println("savedCall is null");
+                    }
                 } else {
-                    savedCall.reject("Please select the 'Android/media' directory.");
+                    if (savedCall != null) {
+                        savedCall.reject("Please select the 'Android/media' directory.");
+                    }
                 }
             } else {
-                savedCall.reject("Directory selection cancelled.");
+                if (savedCall != null) {
+                    savedCall.reject("Directory selection cancelled.");
+                }
             }
         }
     }
