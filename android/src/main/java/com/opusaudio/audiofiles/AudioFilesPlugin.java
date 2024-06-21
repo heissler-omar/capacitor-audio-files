@@ -7,6 +7,9 @@ import android.net.Uri;
 import android.os.Build;
 import android.provider.DocumentsContract;
 import android.webkit.MimeTypeMap;
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
+import androidx.annotation.NonNull;
 import androidx.annotation.RequiresApi;
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
@@ -16,7 +19,6 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 import com.getcapacitor.annotation.Permission;
 import com.getcapacitor.PluginMethod;
 import android.Manifest;
-
 import java.util.ArrayList;
 import java.util.List;
 
@@ -35,8 +37,40 @@ import java.util.List;
 
 public class AudioFilesPlugin extends Plugin {
 
-    private static final int REQUEST_CODE_OPEN_DIRECTORY = 1;
     private PluginCall savedCall;
+
+    private ActivityResultLauncher<Intent> directoryPickerLauncher;
+
+    @Override
+    public void load() {
+        super.load();
+        directoryPickerLauncher = getActivity().registerForActivityResult(
+            new ActivityResultContracts.StartActivityForResult(),
+            result -> {
+                if (result.getResultCode() == Activity.RESULT_OK && result.getData() != null) {
+                    Uri treeUri = result.getData().getData();
+                    String path = treeUri.getPath();
+
+                    if (path != null && path.contains("primary:Android/media")) {
+                        getActivity().getContentResolver().takePersistableUriPermission(treeUri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                        JSObject res = new JSObject();
+                        res.put("uri", treeUri.toString());
+                        if (savedCall != null) {
+                            savedCall.resolve(res);
+                        }
+                    } else {
+                        if (savedCall != null) {
+                            savedCall.reject("Please select the 'Android/media' directory.");
+                        }
+                    }
+                } else {
+                    if (savedCall != null) {
+                        savedCall.reject("Directory selection cancelled.");
+                    }
+                }
+            }
+        );
+    }
 
     @RequiresApi(api = Build.VERSION_CODES.KITKAT)
     @PluginMethod
@@ -45,39 +79,7 @@ public class AudioFilesPlugin extends Plugin {
         Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
         intent.addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
         intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-        startActivityForResult(call, intent, REQUEST_CODE_OPEN_DIRECTORY);
-    }
-
-    @RequiresApi(api = Build.VERSION_CODES.KITKAT)
-    @Override
-    protected void handleOnActivityResult(int requestCode, int resultCode, Intent data) {
-        super.handleOnActivityResult(requestCode, resultCode, data);
-        if (requestCode == REQUEST_CODE_OPEN_DIRECTORY) {
-            if (resultCode == Activity.RESULT_OK && data != null) {
-                Uri treeUri = data.getData();
-                String path = treeUri.getPath();
-
-                if (path != null && path.contains("primary:Android/media")) {
-                    getActivity().getContentResolver().takePersistableUriPermission(treeUri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
-                    JSObject result = new JSObject();
-                    result.put("uri", treeUri.toString());
-                    if (savedCall != null) {
-                        savedCall.resolve(result);
-                    } else {
-                        // Log para ver si savedCall es null
-                        System.out.println("savedCall is null");
-                    }
-                } else {
-                    if (savedCall != null) {
-                        savedCall.reject("Please select the 'Android/media' directory.");
-                    }
-                }
-            } else {
-                if (savedCall != null) {
-                    savedCall.reject("Directory selection cancelled.");
-                }
-            }
-        }
+        directoryPickerLauncher.launch(intent);
     }
 
     @RequiresApi(api = Build.VERSION_CODES.KITKAT)
